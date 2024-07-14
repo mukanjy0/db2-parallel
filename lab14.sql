@@ -46,7 +46,7 @@ insert into Estudiante (DNI, Nombre, Ciudad, Grupo, Promedio, Edad, Sexo) values
 ==================
  */
 
-CREATE OR REPLACE FUNCTION update_estudiante()
+CREATE OR REPLACE FUNCTION update_Estudiante()
 RETURNS TRIGGER AS $$
 DECLARE
     nombre varchar;
@@ -63,10 +63,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE TRIGGER trigger_update_estudiante
+CREATE OR REPLACE TRIGGER trigger_update_Estudiante
 BEFORE INSERT ON Aux
 FOR EACH ROW
-EXECUTE PROCEDURE update_estudiante();
+EXECUTE PROCEDURE update_Estudiante();
 
 insert into Aux (DNI, Nombre, Ciudad, Grupo, Promedio, Edad, Sexo) values
     ('0005', 'Selene Aguirre', 'Ayacucho', 'A', 8.5, 17, 'F'),
@@ -82,10 +82,32 @@ select * from Estudiante;
 |       P2       |
 ==================
  */
+drop table if exists Estudiante;
+create table Estudiante (
+    DNI char(4) not null,
+    Nombre varchar not null,
+    Ciudad varchar(20) not null,
+    Grupo char(1),
+    Promedio float,
+    Edad smallint,
+    Sexo char(1)
+    )
+partition by list (Ciudad);
+
 
 -- execute for each remote server
 create database remote_db; -- connect to remote_db afterwards
 create schema remote_schema;
+
+SELECT * FROM pg_catalog.pg_tables where tablename like '%Estudiante%';
+
+-- remote2
+create table Estudiante_Ayacucho partition of Estudiante for values in ('Ayacucho');
+create table Estudiante_Arequipa partition of Estudiante for values in ('Arequipa');
+
+-- local
+create table Estudiante_Callao partition of Estudiante for values in ('Callao');
+create table Estudiante_Junin partition of Estudiante for values in ('Junin');
 
 -- set up schema locally
 create schema local_schema;
@@ -95,18 +117,57 @@ show search_path ;
 -- execute for remote servers and local server
 create extension postgres_fdw;
 
--- configure connection with remote1
+/*
+==================
+|     Remote1     |
+==================
+ */
+
 drop server remote1 cascade;
 create server remote1 foreign data wrapper postgres_fdw options
-(host 'host.docker.internal', dbname 'remote_db', port '5433'); -- using docker for local_db too
+    (host 'host.docker.internal', dbname 'remote_db', port '5433'); -- using docker for local_db too
 
 create user mapping for current_user
-server remote1
-options (user 'postgres', password 'ihavethepower');
+    server remote1
+    options (user 'postgres', password 'ihavethepower');
 
 import foreign schema remote_schema
     from server remote1
     into local_schema;
+
+-- Estudiante_Lima
+create foreign table local_schema.Estudiante_Lima
+    partition of local_schema.Estudiante for values in ('Lima')
+    server remote1
+    options (schema_name 'remote_schema', table_name 'Estudiante_Lima');
+
+drop table if exists Estudiante_Lima;
+create table Estudiante_Lima (
+    DNI char(4) not null,
+    Nombre varchar not null,
+    Ciudad varchar(20) not null,
+    Grupo char(1),
+    Promedio float,
+    Edad smallint,
+    sexo char(1)
+);
+
+-- Estudiante_Tacna
+create foreign table local_schema.Estudiante_Tacna
+    partition of local_schema.Estudiante for values in ('Tacna')
+    server remote1
+    options (schema_name 'remote_schema', table_name 'Estudiante_Tacna');
+
+drop table if exists Estudiante_Tacna;
+create table Estudiante_Tacna (
+    DNI char(4) not null,
+    Nombre varchar not null,
+    Ciudad varchar(20) not null,
+    Grupo char(1),
+    Promedio float,
+    Edad smallint,
+    Sexo char(1)
+);
 
 -- configure connection with remote2
 create server remote2 foreign data wrapper postgres_fdw options
@@ -124,36 +185,13 @@ import foreign schema remote_schema
 select * from pg_foreign_server;
 
 -- local_schema
-drop table if exists Estudiante;
-create table Estudiante (
-    DNI char(4) not null,
-    Nombre varchar not null,
-    Ciudad varchar(20) not null,
-    Grupo char(1),
-    Promedio float,
-    Edad smallint,
-    Sexo char(1)
-)
-partition by list (Ciudad);
-
-drop table if exists Aux;
-create table Aux (
-     DNI char(4) not null,
-     Nombre varchar not null,
-     Ciudad varchar(20) not null,
-     Grupo char(1),
-     Promedio float,
-     Edad smallint,
-     Sexo char(1)
-);
-
 create table it (
     n_servers smallint not null,
     cur_server smallint not null
 );
 insert into it (n_servers, cur_server) values (3,0);
 
-CREATE OR REPLACE FUNCTION update_estudiante()
+CREATE OR REPLACE FUNCTION update_Estudiante()
     RETURNS TRIGGER AS $$
 DECLARE
     nombre varchar;
@@ -167,10 +205,6 @@ BEGIN
         THEN
             EXECUTE 'create table local_schema.' || nombre || ' partition of Estudiante for values in (' || quote_literal(NEW.Ciudad) || ');';
         ELSE
-            EXECUTE 'create foreign table local_schema.' || nombre
-                        || ' partition of local_schema.Estudiante for values in (' || quote_literal(NEW.Ciudad) || ')'
-                        || ' server remote' || i::text
-                        || ' options (schema_name ''remote_schema'', table_name ''' || nombre || ''');';
         END IF;
         i := mod(i + 1, n);
         EXECUTE 'update it set cur_server = ' || i::text || ' where n_servers = ' || n::text || ';';
@@ -181,10 +215,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE TRIGGER trigger_update_estudiante
+CREATE OR REPLACE TRIGGER trigger_update_Estudiante
     BEFORE INSERT ON Aux
     FOR EACH ROW
-EXECUTE PROCEDURE update_estudiante();
+EXECUTE PROCEDURE update_Estudiante();
 
 /*
 ==================
@@ -192,16 +226,13 @@ EXECUTE PROCEDURE update_estudiante();
 ==================
  */
 
-insert into Aux (DNI, Nombre, Ciudad, Grupo, Promedio, Edad, Sexo) values
+insert into local_schema.Estudiante (DNI, Nombre, Ciudad, Grupo, Promedio, Edad, Sexo) values
     ('0001', 'Selene Aguirre', 'Lima', 'A', 8.5, 17, 'F'),
     ('0002', 'Martin Porres', 'Lima', 'C', 9, 23, 'M'),
     ('0003', 'Miriam Gutierrez', 'Callao', 'A', 7, 21, 'F'),
     ('0004', 'Benito Lopez', 'Callao', 'B', 10, 19, 'M'),
-    ('0005', 'Willy Aguirre', 'Ayacucho', 'C', 8, 17, 'F'),
     ('0006', 'Lisa Porres', 'Junin', 'B', 9, 24, 'M'),
-    ('0007', 'Lucia Gutierrez', 'Arequipa', 'A', 7, 21, 'F'),
     ('0008', 'Gabriel Lopez', 'Tacna', 'A', 12, 19, 'M');
-
 
 select * from it;
 update it set cur_server = 1 where n_servers = 3;
