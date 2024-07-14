@@ -74,7 +74,6 @@ insert into Aux (DNI, Nombre, Ciudad, Grupo, Promedio, Edad, Sexo) values
     ('0007', 'Miriam Gutierrez', 'Arequipa', 'A', 7, 21, 'F'),
     ('0008', 'Benito Lopez', 'Tacna', 'B', 10, 19, 'M');
 
-delete from Aux;
 select * from estudiante;
 
 /*
@@ -248,3 +247,45 @@ insert into local_schema.estudiante (DNI, Nombre, Ciudad, Grupo, Promedio, Edad,
 
 explain analyse
 select * from estudiante;
+
+/*
+==================
+|     Queries    |
+==================
+ */
+
+-- query 1
+explain analyse
+select * from estudiante;
+
+-- query 2
+explain analyse
+SELECT Ciudad, AVG(Promedio) as Promedio_Ciudad
+FROM estudiante
+GROUP BY Ciudad;
+
+-- query 3
+explain analyse
+SELECT * FROM estudiante
+WHERE Ciudad = 'Trujillo';
+
+-- query 4
+explain analyse
+SELECT * FROM estudiante
+WHERE Ciudad in ('Arequipa' , 'Trujillo') AND Promedio > 5.0;
+
+-- query 5
+explain analyse
+SELECT Ciudad, Grupo, AVG(Promedio) AS Promedio_Grupo, MIN(Edad) AS Edad_Minima
+FROM Estudiante
+GROUP BY Ciudad, Grupo;
+
+-- query 6
+explain analyse
+SELECT DNI, Nombre, Ciudad, Promedio
+FROM Estudiante AS e WHERE e.Ciudad  = 'Callao'
+AND e.Promedio > (
+    SELECT AVG(Promedio)
+    FROM Estudiante
+    WHERE Ciudad='Callao'
+);
