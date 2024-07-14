@@ -82,6 +82,21 @@ select * from estudiante;
 |       P2       |
 ==================
  */
+
+/*
+==================
+|     schemas    |
+==================
+ */
+-- set up schema locally
+create schema local_schema;
+set search_path to local_schema;
+show search_path ;
+
+-- execute for each remote server
+create database remote_db; -- connect to remote_db afterwards
+create schema remote_schema;
+
  -- POSTGRES_FDW IS CASE SENSITIVE
 drop table if exists estudiante;
 create table estudiante (
@@ -96,20 +111,11 @@ create table estudiante (
 partition by list (Ciudad);
 
 
--- execute for each remote server
-create database remote_db; -- connect to remote_db afterwards
-create schema remote_schema;
-
 SELECT * FROM pg_catalog.pg_tables where tablename like '%estudiante%';
 
 -- local
 create table estudiante_callao partition of estudiante for values in ('Callao');
 create table estudiante_junin partition of estudiante for values in ('Junin');
-
--- set up schema locally
-create schema local_schema;
-set search_path to local_schema;
-show search_path ;
 
 -- execute for remote servers and local server
 create extension postgres_fdw;
@@ -190,7 +196,7 @@ import foreign schema remote_schema
 -- estudiante_Arequipa
 create foreign table local_schema.estudiante_arequipa
     partition of local_schema.estudiante for values in ('Arequipa')
-    server remote1
+    server remote2
     options (schema_name 'remote_schema', table_name 'estudiante_arequipa');
 
 -- connect to remote2
@@ -208,7 +214,7 @@ create table estudiante_arequipa (
 -- estudiante_Trujillo
 create foreign table local_schema.estudiante_trujillo
     partition of local_schema.estudiante for values in ('Trujillo')
-    server remote1
+    server remote2
     options (schema_name 'remote_schema', table_name 'estudiante_trujillo');
 
 -- connect to remote2
