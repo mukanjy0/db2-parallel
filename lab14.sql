@@ -8,8 +8,8 @@ show search_path;
  ==================
  */
 
-drop table if exists Estudiante;
-create table Estudiante (
+drop table if exists estudiante;
+create table estudiante (
     DNI char(4) not null,
     Nombre varchar not null,
     Ciudad varchar(20) not null,
@@ -31,10 +31,10 @@ create table Aux (
     Sexo char(1)
 );
 
-create table Estudiante_Lima partition of Estudiante for values in ('Lima');
-create table Estudiante_Callao partition of Estudiante for values in ('Callao');
+create table estudiante_Lima partition of estudiante for values in ('Lima');
+create table estudiante_Callao partition of estudiante for values in ('Callao');
 
-insert into Estudiante (DNI, Nombre, Ciudad, Grupo, Promedio, Edad, Sexo) values
+insert into estudiante (DNI, Nombre, Ciudad, Grupo, Promedio, Edad, Sexo) values
     ('0001', 'Selene Aguirre', 'Lima', 'A', 8.5, 17, 'F'),
     ('0002', 'Martin Porres', 'Lima', 'C', 9, 23, 'M'),
     ('0003', 'Miriam Gutierrez', 'Callao', 'A', 7, 21, 'F'),
@@ -46,27 +46,27 @@ insert into Estudiante (DNI, Nombre, Ciudad, Grupo, Promedio, Edad, Sexo) values
 ==================
  */
 
-CREATE OR REPLACE FUNCTION update_Estudiante()
+CREATE OR REPLACE FUNCTION update_estudiante()
 RETURNS TRIGGER AS $$
 DECLARE
     nombre varchar;
 BEGIN
-    IF NOT EXISTS (SELECT Ciudad FROM Estudiante WHERE Ciudad = quote_literal(NEW.Ciudad))
+    IF NOT EXISTS (SELECT Ciudad FROM estudiante WHERE Ciudad = quote_literal(NEW.Ciudad))
     THEN
-        nombre := 'Estudiante_' || NEW.Ciudad;
+        nombre := 'estudiante_' || NEW.Ciudad;
         RAISE NOTICE '%', nombre;
-        EXECUTE 'create table ' || nombre || ' partition of Estudiante for values in (' || quote_literal(NEW.Ciudad) || ');';
+        EXECUTE 'create table ' || nombre || ' partition of estudiante for values in (' || quote_literal(NEW.Ciudad) || ');';
     END IF;
     RAISE NOTICE '%', quote_literal(NEW);
-    EXECUTE 'insert into Estudiante select ($1).*' using NEW;
+    EXECUTE 'insert into estudiante select ($1).*' using NEW;
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE TRIGGER trigger_update_Estudiante
+CREATE OR REPLACE TRIGGER trigger_update_estudiante
 BEFORE INSERT ON Aux
 FOR EACH ROW
-EXECUTE PROCEDURE update_Estudiante();
+EXECUTE PROCEDURE update_estudiante();
 
 insert into Aux (DNI, Nombre, Ciudad, Grupo, Promedio, Edad, Sexo) values
     ('0005', 'Selene Aguirre', 'Ayacucho', 'A', 8.5, 17, 'F'),
@@ -75,15 +75,16 @@ insert into Aux (DNI, Nombre, Ciudad, Grupo, Promedio, Edad, Sexo) values
     ('0008', 'Benito Lopez', 'Tacna', 'B', 10, 19, 'M');
 
 delete from Aux;
-select * from Estudiante;
+select * from estudiante;
 
 /*
 ==================
 |       P2       |
 ==================
  */
-drop table if exists Estudiante;
-create table Estudiante (
+ -- POSTGRES_FDW IS CASE SENSITIVE
+drop table if exists estudiante;
+create table estudiante (
     DNI char(4) not null,
     Nombre varchar not null,
     Ciudad varchar(20) not null,
@@ -99,15 +100,11 @@ partition by list (Ciudad);
 create database remote_db; -- connect to remote_db afterwards
 create schema remote_schema;
 
-SELECT * FROM pg_catalog.pg_tables where tablename like '%Estudiante%';
-
--- remote2
-create table Estudiante_Ayacucho partition of Estudiante for values in ('Ayacucho');
-create table Estudiante_Arequipa partition of Estudiante for values in ('Arequipa');
+SELECT * FROM pg_catalog.pg_tables where tablename like '%estudiante%';
 
 -- local
-create table Estudiante_Callao partition of Estudiante for values in ('Callao');
-create table Estudiante_Junin partition of Estudiante for values in ('Junin');
+create table estudiante_callao partition of estudiante for values in ('Callao');
+create table estudiante_junin partition of estudiante for values in ('Junin');
 
 -- set up schema locally
 create schema local_schema;
@@ -135,14 +132,15 @@ import foreign schema remote_schema
     from server remote1
     into local_schema;
 
--- Estudiante_Lima
-create foreign table local_schema.Estudiante_Lima
-    partition of local_schema.Estudiante for values in ('Lima')
+-- estudiante_Lima
+create foreign table local_schema.estudiante_lima
+    partition of local_schema.estudiante for values in ('Lima')
     server remote1
-    options (schema_name 'remote_schema', table_name 'Estudiante_Lima');
+    options (schema_name 'remote_schema', table_name 'estudiante_lima');
 
-drop table if exists Estudiante_Lima;
-create table Estudiante_Lima (
+-- connect to remote1
+drop table if exists estudiante_lima;
+create table estudiante_lima (
     DNI char(4) not null,
     Nombre varchar not null,
     Ciudad varchar(20) not null,
@@ -152,14 +150,15 @@ create table Estudiante_Lima (
     sexo char(1)
 );
 
--- Estudiante_Tacna
-create foreign table local_schema.Estudiante_Tacna
-    partition of local_schema.Estudiante for values in ('Tacna')
+-- estudiante_Tacna
+create foreign table local_schema.estudiante_tacna
+    partition of local_schema.estudiante for values in ('Tacna')
     server remote1
-    options (schema_name 'remote_schema', table_name 'Estudiante_Tacna');
+    options (schema_name 'remote_schema', table_name 'estudiante_tacna');
 
-drop table if exists Estudiante_Tacna;
-create table Estudiante_Tacna (
+-- connect to remote1
+drop table if exists estudiante_tacna;
+create table estudiante_tacna (
     DNI char(4) not null,
     Nombre varchar not null,
     Ciudad varchar(20) not null,
@@ -169,7 +168,14 @@ create table Estudiante_Tacna (
     Sexo char(1)
 );
 
+/*
+==================
+|     Remote2     |
+==================
+ */
+
 -- configure connection with remote2
+drop server remote2 cascade;
 create server remote2 foreign data wrapper postgres_fdw options
     (host 'host.docker.internal', dbname 'remote_db', port '5434'); -- using docker for local_db too
 
@@ -181,44 +187,41 @@ import foreign schema remote_schema
     from server remote2
     into local_schema;
 
--- checking
-select * from pg_foreign_server;
+-- estudiante_Arequipa
+create foreign table local_schema.estudiante_arequipa
+    partition of local_schema.estudiante for values in ('Arequipa')
+    server remote1
+    options (schema_name 'remote_schema', table_name 'estudiante_arequipa');
 
--- local_schema
-create table it (
-    n_servers smallint not null,
-    cur_server smallint not null
+-- connect to remote2
+drop table if exists estudiante_arequipa;
+create table estudiante_arequipa (
+    DNI char(4) not null,
+    Nombre varchar not null,
+    Ciudad varchar(20) not null,
+    Grupo char(1),
+    Promedio float,
+    Edad smallint,
+    sexo char(1)
 );
-insert into it (n_servers, cur_server) values (3,0);
 
-CREATE OR REPLACE FUNCTION update_Estudiante()
-    RETURNS TRIGGER AS $$
-DECLARE
-    nombre varchar;
-    n smallint := (select n_servers from it);
-    i smallint := (select cur_server from it);
-BEGIN
-    IF NOT EXISTS (SELECT Ciudad FROM Estudiante WHERE Ciudad = quote_literal(NEW.Ciudad))
-    THEN
-        nombre := 'Estudiante_' || NEW.Ciudad;
-        IF i = 0::smallint
-        THEN
-            EXECUTE 'create table local_schema.' || nombre || ' partition of Estudiante for values in (' || quote_literal(NEW.Ciudad) || ');';
-        ELSE
-        END IF;
-        i := mod(i + 1, n);
-        EXECUTE 'update it set cur_server = ' || i::text || ' where n_servers = ' || n::text || ';';
-    END IF;
-    -- RAISE NOTICE '%', quote_literal(NEW);
-    EXECUTE 'insert into local_schema.Estudiante select ($1).*' using NEW;
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
+-- estudiante_Trujillo
+create foreign table local_schema.estudiante_trujillo
+    partition of local_schema.estudiante for values in ('Trujillo')
+    server remote1
+    options (schema_name 'remote_schema', table_name 'estudiante_trujillo');
 
-CREATE OR REPLACE TRIGGER trigger_update_Estudiante
-    BEFORE INSERT ON Aux
-    FOR EACH ROW
-EXECUTE PROCEDURE update_Estudiante();
+-- connect to remote2
+drop table if exists estudiante_trujillo;
+create table estudiante_trujillo (
+    DNI char(4) not null,
+    Nombre varchar not null,
+    Ciudad varchar(20) not null,
+    Grupo char(1),
+    Promedio float,
+    Edad smallint,
+    Sexo char(1)
+);
 
 /*
 ==================
@@ -226,7 +229,10 @@ EXECUTE PROCEDURE update_Estudiante();
 ==================
  */
 
-insert into local_schema.Estudiante (DNI, Nombre, Ciudad, Grupo, Promedio, Edad, Sexo) values
+-- checking
+select * from pg_foreign_server;
+
+insert into local_schema.estudiante (DNI, Nombre, Ciudad, Grupo, Promedio, Edad, Sexo) values
     ('0001', 'Selene Aguirre', 'Lima', 'A', 8.5, 17, 'F'),
     ('0002', 'Martin Porres', 'Lima', 'C', 9, 23, 'M'),
     ('0003', 'Miriam Gutierrez', 'Callao', 'A', 7, 21, 'F'),
@@ -234,7 +240,5 @@ insert into local_schema.Estudiante (DNI, Nombre, Ciudad, Grupo, Promedio, Edad,
     ('0006', 'Lisa Porres', 'Junin', 'B', 9, 24, 'M'),
     ('0008', 'Gabriel Lopez', 'Tacna', 'A', 12, 19, 'M');
 
-select * from it;
-update it set cur_server = 1 where n_servers = 3;
 explain analyse
-select * from Estudiante;
+select * from estudiante;
